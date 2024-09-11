@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { createRoot } from "react-dom/client";
 import { PlusCircle, Search, Settings, CheckCircle2, XCircle, Circle } from "lucide-react"
+import "./globals.css"
 
 export default function Component() {
   const problems = [
