@@ -1,77 +1,137 @@
-import React, { useEffect, useState } from "react";
-import { createRoot } from "react-dom/client";
+import React, { useState, useEffect } from "react"
+import { motion } from "framer-motion"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Code, Save, CheckCircle } from 'lucide-react'
+import 'react-toastify/dist/ReactToastify.css'
+import { createRoot } from 'react-dom/client'
+import "./globals.css"
+ 
 
-const Options = () => {
-  const [color, setColor] = useState<string>("");
-  const [status, setStatus] = useState<string>("");
-  const [like, setLike] = useState<boolean>(false);
+export default function Component() {
+  const [user, setUser] = useState({ _id: "" })
+  const [formState, setFormState] = useState<"ready" | "saving" | "saved">("ready")
+  const [forgettingCurve, setForgettingCurve] = useState("1, 2, 4, 7, 15, 30")
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Restores select box and checkbox state using the preferences
-    // stored in chrome.storage.
-    chrome.storage.sync.get(
-      {
-        favoriteColor: "red",
-        likesColor: true,
-      },
-      (items) => {
-        setColor(items.favoriteColor);
-        setLike(items.likesColor);
+    chrome.storage.sync.get(['user', 'remindSettings'], (result) => {
+      if (result.user) {
+        setUser(result.user)
       }
-    );
-  }, []);
+      if (result.remindSettings && result.remindSettings.forgettingCurve) {
+        setForgettingCurve(result.remindSettings.forgettingCurve.join(", "))
+      }
+    })
+  }, [])
 
-  const saveOptions = () => {
-    // Saves options to chrome.storage.sync.
-    chrome.storage.sync.set(
-      {
-        favoriteColor: color,
-        likesColor: like,
-      },
-      () => {
-        // Update status to let user know options were saved.
-        setStatus("Options saved.");
-        const id = setTimeout(() => {
-          setStatus("");
-        }, 1000);
-        return () => clearTimeout(id);
+  const submitHandler = async () => {
+    setFormState("saving")
+    setError(null)
+
+    try {
+      if (!user._id.trim()) {
+        throw new Error("Invalid user ID")
       }
-    );
-  };
+
+      const newForgettingCurve = forgettingCurve.split(",").map(day => parseInt(day.trim())).filter(day => !isNaN(day))
+      
+      await chrome.storage.sync.set({
+        user: { _id: user._id },
+        remindSettings: { forgettingCurve: newForgettingCurve }
+      })
+
+      console.log("Saved settings:", {
+        user: { _id: user._id },
+        remindSettings: { forgettingCurve: newForgettingCurve }
+      })
+
+      setFormState("saved")
+      setTimeout(() => setFormState("ready"), 2000)
+    } catch (error) {
+      console.error(error)
+      setError("Failed to save settings. Please try again.")
+      setFormState("ready")
+    }
+  }
 
   return (
-    <>
-      <div>
-        Favorite color: <select
-          value={color}
-          onChange={(event) => setColor(event.target.value)}
-        >
-          <option value="red">red</option>
-          <option value="green">green</option>
-          <option value="blue">blue</option>
-          <option value="yellow">yellow</option>
-        </select>
-      </div>
-      <div>
-        <label>
-          <input
-            type="checkbox"
-            checked={like}
-            onChange={(event) => setLike(event.target.checked)}
-          />
-          I like colors.
-        </label>
-      </div>
-      <div>{status}</div>
-      <button onClick={saveOptions}>Save</button>
-    </>
-  );
-};
+    <div className="min-h-screen bg-[#F7F6F3] flex flex-col p-8">
+      <motion.header 
+        initial={{ y: -50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="flex items-center mb-8"
+      >
+        <Code className="text-[#FFA116] w-8 h-8 mr-2" />
+        <h1 className="text-3xl font-bold text-gray-800">LeetCode Tracker Options</h1>
+      </motion.header>
+
+      <Card className="w-full max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle>Configure Your Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="leetcode-username">LeetCode Username</Label>
+            <Input
+              id="leetcode-username"
+              value={user._id}
+              onChange={(e) => setUser({ ...user, _id: e.target.value })}
+              placeholder="Enter your LeetCode username"
+              disabled={formState === "saving"}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="forgetting-curve">Reminder Days (Forgetting Curve)</Label>
+            <Input
+              id="forgetting-curve"
+              value={forgettingCurve}
+              onChange={(e) => setForgettingCurve(e.target.value)}
+              placeholder="e.g. 1, 2, 4, 7, 15, 30"
+              disabled={formState === "saving"}
+            />
+            <p className="text-sm text-gray-500">
+              Enter the number of days for reminders, separated by commas. These represent the forgetting curve for spaced repetition.
+            </p>
+          </div>
+
+          <Button 
+            onClick={submitHandler} 
+            disabled={formState === "saving"}
+            className="w-full bg-[#FFA116] hover:bg-[#FFB84D] text-white relative"
+          >
+            {formState === "saving" ? (
+              "Saving..."
+            ) : formState === "saved" ? (
+              <>
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Saved
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save Settings
+              </>
+            )}
+          </Button>
+
+          {error && (
+            <p className="text-red-500 text-sm mt-2">{error}</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
 
 const root = createRoot(document.getElementById("root")!);
 
 root.render(
   <React.StrictMode>
-    <Options />
+    <Component />
   </React.StrictMode>
 );

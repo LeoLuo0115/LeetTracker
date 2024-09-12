@@ -6,7 +6,8 @@
   "version": "1.0",
 
   "options_ui": {
-    "page": "options.html"
+    "page": "options.html",
+    "open_in_tab": true
   },
 
   "action": {
@@ -19,22 +20,27 @@
     "default_popup": "popup.html"
   },
 
-  "content_scripts": [
-      {
-          "matches": ["<all_urls>"],
-          "js": ["js/vendor.js", "js/content_script.js"]
-      }
-  ],
-
   "background": {
     "service_worker": "js/background.js"
   },
 
   "permissions": [
-    "storage"
+    "storage",
+    "activeTab",
+    "webRequest",
+    "alarms",
+    "notifications",
+    "webNavigation"
   ],
 
   "host_permissions": [
-    "<all_urls>"
+    "*://*.leetcode.com/*"
+  ],
+  
+  "content_scripts": [
+    {
+        "matches": ["https://leetcode.com/problems/*"],
+        "js": ["js/vendor.js", "js/content_script.js"]
+    }
   ]
 }
