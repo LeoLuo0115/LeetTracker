@@ -13,7 +13,8 @@ import "./globals.css"
 export default function Component() {
   const [user, setUser] = useState({ _id: "" })
   const [formState, setFormState] = useState<"ready" | "saving" | "saved">("ready")
-  const [forgettingCurve, setForgettingCurve] = useState("1, 2, 4, 7, 15, 30")
+  const [forgettingCurve, setForgettingCurve] = useState("1, 2, 4, 7, 15")
+  const [forgettingCurveError, setForgettingCurveError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -27,16 +28,66 @@ export default function Component() {
     })
   }, [])
 
+  const validateForgettingCurve = (value: string): string | null => {
+    // Remove leading and trailing whitespace
+    const trimmedValue = value.trim();
+    
+    // Split by commas and trim each part
+    const parts = trimmedValue.split(',').map(part => part.trim());
+    
+    // Check if there are any empty parts or non-numeric parts
+    if (parts.some(part => part === '' || !/^\d+$/.test(part))) {
+      return "Invalid input: each entry must be a number.";
+    }
+    
+    const numbers = parts.map(Number);
+    if (numbers.length === 0) return "Please enter at least one number.";
+    if (numbers.length > 5) return "Please enter no more than 5 numbers.";
+    
+    let prevNum = 0;
+    for (let i = 0; i < numbers.length; i++) {
+      const num = numbers[i];
+      if (num < 1 || num > 99) return `Number ${num} is out of range (1-99).`;
+      if (num <= prevNum) return `Number ${num} should be greater than ${prevNum}.`;
+      prevNum = num;
+    }
+    
+    // Check if the trimmed input exactly matches the valid numbers joined by commas
+    if (trimmedValue !== numbers.join(', ')) {
+      return "Invalid input: extra content detected.";
+    }
+    
+    return null;
+  };
+
+  const handleForgettingCurveChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setForgettingCurve(value);
+    
+    if (value.trim() === '') {
+      setForgettingCurveError(null);
+    } else {
+      const error = validateForgettingCurve(value);
+      setForgettingCurveError(error);
+    }
+  };
+
   const submitHandler = async () => {
     setFormState("saving")
-    setError(null)
 
     try {
       if (!user._id.trim()) {
         throw new Error("Invalid user ID")
       }
 
-      const newForgettingCurve = forgettingCurve.split(",").map(day => parseInt(day.trim())).filter(day => !isNaN(day))
+      const error = validateForgettingCurve(forgettingCurve);
+      if (error) {
+        setForgettingCurveError(error);
+        setFormState("ready");
+        return;
+      }
+
+      const newForgettingCurve = forgettingCurve.split(",").map(day => parseInt(day.trim()))
       
       await chrome.storage.sync.set({
         user: { _id: user._id },
@@ -52,7 +103,7 @@ export default function Component() {
       setTimeout(() => setFormState("ready"), 2000)
     } catch (error) {
       console.error(error)
-      setError("Failed to save settings. Please try again.")
+      setError(error instanceof Error ? error.message : String(error))
       setFormState("ready")
     }
   }
@@ -90,12 +141,16 @@ export default function Component() {
             <Input
               id="forgetting-curve"
               value={forgettingCurve}
-              onChange={(e) => setForgettingCurve(e.target.value)}
-              placeholder="e.g. 1, 2, 4, 7, 15, 30"
+              onChange={handleForgettingCurveChange}
+              placeholder="e.g. 1, 2, 4, 7, 15"
               disabled={formState === "saving"}
+              className={forgettingCurveError ? "border-red-500" : ""}
             />
+            {forgettingCurveError && (
+              <p className="text-red-500 text-sm">{forgettingCurveError}</p>
+            )}
             <p className="text-sm text-gray-500">
-              Enter the number of days for reminders, separated by commas. These represent the forgetting curve for spaced repetition.
+              Enter 1-5 numbers (1-99) for reminders, separated by commas. These represent the forgetting curve for spaced repetition.
             </p>
           </div>
 
