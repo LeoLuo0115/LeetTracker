@@ -5,14 +5,26 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Code, Save, CheckCircle } from 'lucide-react'
-// import 'react-toastify/dist/ReactToastify.css'
 import { createRoot } from 'react-dom/client'
 import "./globals.css"
- 
+
+type FormState = "ready" | "saving" | "saved"
+
+interface User {
+  _id: string
+}
+
+interface RemindSettings {
+  forgettingCurve: number[]
+}
+
+export const FORGETTING_CURVE_LENGTH = 5
+const MIN_DAY = 1
+const MAX_DAY = 99
 
 export default function Component() {
-  const [user, setUser] = useState({ _id: "" })
-  const [formState, setFormState] = useState<"ready" | "saving" | "saved">("ready")
+  const [user, setUser] = useState<User>({ _id: "" })
+  const [formState, setFormState] = useState<FormState>("ready")
   const [forgettingCurve, setForgettingCurve] = useState("1, 2, 4, 7, 15")
   const [forgettingCurveError, setForgettingCurveError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -22,82 +34,73 @@ export default function Component() {
       if (result.user) {
         setUser(result.user)
       }
-      if (result.remindSettings && result.remindSettings.forgettingCurve) {
+      if (result.remindSettings?.forgettingCurve) {
         setForgettingCurve(result.remindSettings.forgettingCurve.join(", "))
       }
     })
   }, [])
 
   const validateForgettingCurve = (value: string): string | null => {
-    // Remove leading and trailing whitespace
-    const trimmedValue = value.trim();
+    const trimmedValue = value.trim()
+    const parts = trimmedValue.split(',').map(part => part.trim())
     
-    // Split by commas and trim each part
-    const parts = trimmedValue.split(',').map(part => part.trim());
-    
-    // Check if there are any empty parts or non-numeric parts
-    if (parts.some(part => part === '' || !/^\d+$/.test(part))) {
-      return "Invalid input: each entry must be a number.";
+    if (parts.length !== FORGETTING_CURVE_LENGTH) {
+      return `Please enter exactly ${FORGETTING_CURVE_LENGTH} numbers.`
     }
+
+    const numbers = parts.map(Number)
     
-    const numbers = parts.map(Number);
-    if (numbers.length === 0) return "Please enter at least one number.";
-    if (numbers.length > 5) return "Please enter no more than 5 numbers.";
-    
-    let prevNum = 0;
     for (let i = 0; i < numbers.length; i++) {
-      const num = numbers[i];
-      if (num < 1 || num > 99) return `Number ${num} is out of range (1-99).`;
-      if (num <= prevNum) return `Number ${num} should be greater than ${prevNum}.`;
-      prevNum = num;
+      if (isNaN(numbers[i])) {
+        return `Invalid input: "${parts[i]}" is not a number.`
+      }
+      if (!Number.isInteger(numbers[i])) {
+        return `Invalid input: "${parts[i]}" is not an integer.`
+      }
+      if (numbers[i] < MIN_DAY || numbers[i] > MAX_DAY) {
+        return `Number ${numbers[i]} is out of range (${MIN_DAY}-${MAX_DAY}).`
+      }
+      if (i > 0 && numbers[i] <= numbers[i - 1]) {
+        return `Number ${numbers[i]} should be greater than ${numbers[i - 1]}.`
+      }
     }
-    
-    // Check if the trimmed input exactly matches the valid numbers joined by commas
+
     if (trimmedValue !== numbers.join(', ')) {
-      return "Invalid input: extra content detected.";
+      return "Invalid input: please use comma-separated integers only."
     }
-    
-    return null;
-  };
+
+    return null
+  }
 
   const handleForgettingCurveChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setForgettingCurve(value);
-    
-    if (value.trim() === '') {
-      setForgettingCurveError(null);
-    } else {
-      const error = validateForgettingCurve(value);
-      setForgettingCurveError(error);
-    }
-  };
+    const value = e.target.value
+    setForgettingCurve(value)
+    setForgettingCurveError(value.trim() ? validateForgettingCurve(value) : null)
+  }
 
   const submitHandler = async () => {
     setFormState("saving")
+    setError(null)
 
     try {
       if (!user._id.trim()) {
         throw new Error("Invalid user ID")
       }
 
-      const error = validateForgettingCurve(forgettingCurve);
-      if (error) {
-        setForgettingCurveError(error);
-        setFormState("ready");
-        return;
+      const curveError = validateForgettingCurve(forgettingCurve)
+      if (curveError) {
+        setForgettingCurveError(curveError)
+        throw new Error(curveError)
       }
 
       const newForgettingCurve = forgettingCurve.split(",").map(day => parseInt(day.trim()))
       
       await chrome.storage.sync.set({
         user: { _id: user._id },
-        remindSettings: { forgettingCurve: newForgettingCurve }
+        remindSettings: { forgettingCurve: newForgettingCurve } as RemindSettings
       })
 
-      console.log("Saved settings:", {
-        user: { _id: user._id },
-        remindSettings: { forgettingCurve: newForgettingCurve }
-      })
+      console.log("Saved settings:", { user: { _id: user._id }, remindSettings: { forgettingCurve: newForgettingCurve } })
 
       setFormState("saved")
       setTimeout(() => setFormState("ready"), 2000)
@@ -130,7 +133,7 @@ export default function Component() {
             <Input
               id="leetcode-username"
               value={user._id}
-              onChange={(e) => setUser({ ...user, _id: e.target.value })}
+              onChange={(e) => setUser({ _id: e.target.value })}
               placeholder="Enter your LeetCode username"
               disabled={formState === "saving"}
             />
@@ -142,7 +145,7 @@ export default function Component() {
               id="forgetting-curve"
               value={forgettingCurve}
               onChange={handleForgettingCurveChange}
-              placeholder="e.g. 1, 2, 4, 7, 15"
+              placeholder={`e.g. 1, 2, 4, 7, 15 (${MIN_DAY}-${MAX_DAY})`}
               disabled={formState === "saving"}
               className={forgettingCurveError ? "border-red-500" : ""}
             />
@@ -150,7 +153,8 @@ export default function Component() {
               <p className="text-red-500 text-sm">{forgettingCurveError}</p>
             )}
             <p className="text-sm text-gray-500">
-              Enter 1-5 numbers (1-99) for reminders, separated by commas. These represent the forgetting curve for spaced repetition.
+              Enter {FORGETTING_CURVE_LENGTH} increasing integers ({MIN_DAY}-{MAX_DAY}) for reminders, separated by commas.
+              These represent the forgetting curve for spaced repetition.
             </p>
           </div>
 
@@ -183,10 +187,10 @@ export default function Component() {
   )
 }
 
-const root = createRoot(document.getElementById("root")!);
+const root = createRoot(document.getElementById("root")!)
 
 root.render(
   <React.StrictMode>
     <Component />
   </React.StrictMode>
-);
+)
