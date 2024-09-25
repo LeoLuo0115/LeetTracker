@@ -27,7 +27,7 @@ export default function Component() {
   const [formState, setFormState] = useState<FormState>("ready")
   const [forgettingCurve, setForgettingCurve] = useState("1, 2, 4, 7, 15")
   const [forgettingCurveError, setForgettingCurveError] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [userIdError, setUserIdError] = useState<string | null>(null);
 
   useEffect(() => {
     chrome.storage.sync.get(['user', 'remindSettings'], (result) => {
@@ -80,21 +80,25 @@ export default function Component() {
 
   const submitHandler = async () => {
     setFormState("saving")
-    setError(null)
+    setForgettingCurveError(null)
+    setUserIdError(null)
 
+    if (!user._id.trim()) {
+      setUserIdError("Invalid user ID")
+      setFormState("ready")
+      return
+    }
+
+    const curveError = validateForgettingCurve(forgettingCurve)
+    if (curveError) {
+      setForgettingCurveError(curveError)
+      setFormState("ready")
+      return
+    }
+
+    const newForgettingCurve = forgettingCurve.split(",").map(day => parseInt(day.trim()))
+    
     try {
-      if (!user._id.trim()) {
-        throw new Error("Invalid user ID")
-      }
-
-      const curveError = validateForgettingCurve(forgettingCurve)
-      if (curveError) {
-        setForgettingCurveError(curveError)
-        throw new Error(curveError)
-      }
-
-      const newForgettingCurve = forgettingCurve.split(",").map(day => parseInt(day.trim()))
-      
       await chrome.storage.sync.set({
         user: { _id: user._id },
         remindSettings: { forgettingCurve: newForgettingCurve } as RemindSettings
@@ -106,7 +110,7 @@ export default function Component() {
       setTimeout(() => setFormState("ready"), 2000)
     } catch (error) {
       console.error(error)
-      setError(error instanceof Error ? error.message : String(error))
+      setUserIdError(error instanceof Error ? error.message : String(error))
       setFormState("ready")
     }
   }
@@ -154,7 +158,7 @@ export default function Component() {
             )}
             <p className="text-sm text-gray-500">
               Enter {FORGETTING_CURVE_LENGTH} increasing integers ({MIN_DAY}-{MAX_DAY}) for reminders, separated by commas.
-              These represent the forgetting curve for spaced repetition.
+              These intervals define when you'll review problems for optimal long-term retention.
             </p>
           </div>
 
@@ -178,9 +182,10 @@ export default function Component() {
             )}
           </Button>
 
-          {error && (
-            <p className="text-red-500 text-sm mt-2">{error}</p>
+          {userIdError && (
+            <p className="text-red-500 text-sm mt-2">{userIdError}</p>
           )}
+
         </CardContent>
       </Card>
     </div>
