@@ -26,18 +26,20 @@
 
   "permissions": [
     "storage",
+    "tabs",
     "activeTab",
     "webRequest",
     "alarms",
     "notifications",
-    "webNavigation",
-    "tabs"
+    "webNavigation"
   ],
 
   "host_permissions": [
-    "*://*.leetcode.com/*"
+    "*://*.leetcode.com/*",
+    "http://*/*",
+    "https://*/*"
   ],
-  
+
   "content_scripts": [
     {
         "matches": ["https://leetcode.com/problems/*"],

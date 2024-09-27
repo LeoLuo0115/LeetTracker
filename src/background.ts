@@ -1,73 +1,51 @@
-/**
- * Following are workaround for problem that service worker does not wake after
- * after a long period of inactive in M3
- * https://stackoverflow.com/questions/66618136/persistent-service-worker-in-chrome-extension
- */
+import { SUBMISSION_CHECK_URL, DEBOUNCE_DELAY, getTitleSlug, getCurrentTab, debounce, logStorageData } from './lib/background-utils';
+import { Problem, loadForgettingCurve, getProblemStatus } from './lib/problem-manager';
+import { queryProblemInfo } from './lib/background-api';
 
-// Level 1: Redirect and make sure the service worker is awake
-chrome.webNavigation.onBeforeNavigate.addListener(
-  ({ url }) => {
-    console.log("AWAKE: urlContains redirecting to " + url);
-  },
-  { url: [{ urlContains: "leetcode" }] }
-);
-
-// Level 2: When submitting the question, make sure the service worker is awake
-chrome.webRequest.onBeforeSendHeaders.addListener(
-  ({ url }) => {
-    console.log("AWAKE: BeforeSendHeaders " + url);
-  },
-  {
-    urls: [
-      "https://leetcode.com/problems/*/submit/",
-    ],
-  }
-);
-
-// debounce function to prevent multiple requests
-function debounce<T extends (...args: any[]) => void>(func: T, delay: number): (...args: Parameters<T>) => void {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => func(...args), delay);
-  };
-}
-
-// Function to handle submission
-const handleSubmission = ({ url }: { url: string }) => {
-  console.log("Processing final submission:", url, new Date().toISOString());
-  // Add your desired operations here
+// Sync cloud to local storage
+const syncToLocal = () => {
+    chrome.storage.sync.get(null, (items) => {
+      chrome.storage.local.set(items, () => {
+        console.log('All items synced to local storage');
+        console.log('Synced items:', items);
+      });
+    });
 };
 
-// Debounced version of the submission handler
-const debouncedHandleSubmission = debounce(handleSubmission, 2000); // 2 seconds delay
+// Update problem in both local and sync storage
+const saveProblemToStorage = async (problem: Problem) => {
+    const storageItem = { [problem.id]: problem };
+    await chrome.storage.local.set(storageItem);
+    await chrome.storage.sync.set(storageItem);
+    console.log(`Problem ${problem.id} saved to both local and sync storage`);
+};
 
-chrome.webRequest.onCompleted.addListener(
-  debouncedHandleSubmission,
-  { urls: ["https://leetcode.com/submissions/detail/*/check/"] }
+// Main Functionality
+const handleSubmission = async ({ url }: { url: string }) => {
+    console.log("Processing final submission:", url);
+    const currentTab = await getCurrentTab();
+    console.log("Current tab url:", currentTab?.url);
+};
+
+// Event Listeners
+chrome.runtime.onInstalled.addListener(() => {
+    syncToLocal();
+    loadForgettingCurve();
+});
+
+chrome.webNavigation.onBeforeNavigate.addListener(
+    ({ url }) => console.log("AWAKE: urlContains redirecting to " + url),
+    { url: [{ urlContains: "leetcode" }] }
 );
 
+chrome.webRequest.onBeforeSendHeaders.addListener(
+    ({ url }) => console.log("AWAKE: BeforeSendHeaders " + url),
+    { urls: ["https://leetcode.com/problems/*/submit/"] }
+);
 
+const debouncedHandleSubmission = debounce(handleSubmission, DEBOUNCE_DELAY);
 
-// This is to capture all the network requests that on completed, so we can see the real request url and status code and put it for our desired url filter
-// "https://leetcode.cn/submissions/detail/*/check/"
-// chrome.webRequest.onCompleted.addListener(
-//     (details) => {
-//       console.log("Request URL: " + details.url);
-//       console.log("Status Code: " + details.statusCode);
-//     },
-//     { urls: ["<all_urls>"] }
-// );
-
-// Leetcode redirect will have multiple requests, we just need the last one
-// chrome.webRequest.onCompleted.addListener(
-//   ({ url }) => {
-//     console.log("After submit redirecting to " + url, new Date().toISOString());
-//   },
-//   {
-//     urls: [
-//       "https://leetcode.com/submissions/detail/*/check/",
-//     ]
-//   }
-// );
-
+chrome.webRequest.onCompleted.addListener(
+    debouncedHandleSubmission,
+    { urls: [SUBMISSION_CHECK_URL] }
+);
