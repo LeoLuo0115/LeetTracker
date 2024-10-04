@@ -1,4 +1,4 @@
-import { SUBMISSION_CHECK_URL, DEBOUNCE_DELAY, getTitleSlug, getCurrentTab, debounce, logStorageData } from './lib/background-utils';
+import { SUBMISSION_CHECK_URL, DEBOUNCE_DELAY, getTitleSlug, getCurrentTab, debounce} from './lib/background-utils';
 import { Problem, loadForgettingCurve, getProblemStatus } from './lib/problem-manager';
 import { queryProblemInfo } from './lib/background-api';
 

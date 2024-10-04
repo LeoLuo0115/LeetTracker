@@ -28,12 +28,3 @@ export const debounce = <T extends (...args: any[]) => void>(func: T, delay: num
         timer = setTimeout(() => func(...args), delay);
     };
 };
-
-export const logStorageData = () => {
-    chrome.storage.sync.get(null, (items) => {
-        console.log('All storage items:', items);
-        Object.entries(items).forEach(([key, value]) => {
-            console.log(`${key}:`, value);
-        });
-    });
-};
