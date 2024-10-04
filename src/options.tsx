@@ -103,6 +103,12 @@ export default function Component() {
         user: { _id: user._id },
         remindSettings: { forgettingCurve: newForgettingCurve } as RemindSettings
       })
+      
+      // sync to local storage
+      await chrome.storage.local.set({
+        user: { _id: user._id },
+        remindSettings: { forgettingCurve: newForgettingCurve } as RemindSettings
+      })
 
       console.log("Saved settings:", { user: { _id: user._id }, remindSettings: { forgettingCurve: newForgettingCurve } })
 

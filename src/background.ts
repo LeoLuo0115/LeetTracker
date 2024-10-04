@@ -22,13 +22,61 @@ const saveProblemToStorage = async (problem: Problem) => {
 
 // Main Functionality
 const handleSubmission = async ({ url }: { url: string }) => {
-    console.log("Processing final submission:", url);
+    // console.log("Processing final submission:", url);
     const currentTab = await getCurrentTab();
-    console.log("Current tab url:", currentTab?.url);
+    // console.log("Current tab url:", currentTab?.url);
+    const titleSlug = getTitleSlug(currentTab?.url!);
+    // console.log("Title slug:", titleSlug);
+    const question = await queryProblemInfo(titleSlug);
+    // console.log("Question:", question);
+    // const problemId = question.questionFrontendId;
+    // console.log("Problem id:", problemId);
+    
+    // make sure question is in cloud storage if not, create a new problem
+    const result = await chrome.storage.local.get(question.questionFrontendId);
+    const existingProblem = result[question.questionFrontendId as keyof typeof result] as Problem | undefined;
+
+    if (existingProblem && getProblemStatus(existingProblem) !== "Archived") {
+        // calculate problem status
+        const problemStatus = getProblemStatus(existingProblem!);
+        console.log("Problem status:", problemStatus);
+        if (problemStatus === "Scheduled") return;
+        if (problemStatus === "Review") {
+            // schedule a review
+            console.log("Scheduling a review");
+            const updatedProblem: Problem = {
+                ...existingProblem,
+                proficiency: Math.min(existingProblem.proficiency + 1, 5),
+                isArchived: existingProblem.proficiency + 1 >= 5
+            };
+            await saveProblemToStorage(updatedProblem);
+        }
+    } else {
+        // create a new problem
+        console.log("Creating a new problem");
+        const now = Date.now();
+        const newProblem: Problem = {
+            id: question.questionFrontendId,
+            title: question.title,
+            difficulty: question.difficulty,
+            url: `https://leetcode.com/problems/${titleSlug}/`,
+            proficiency: Math.min((existingProblem?.proficiency || 0) + 1, 5),
+            submissionTime: now,
+            isArchived: (existingProblem?.proficiency || 0) + 1 >= 5
+        };
+        await saveProblemToStorage(newProblem);
+        // print local storage
+        console.log("Local storage:", await chrome.storage.local.get(null));
+        // print sync storage
+        console.log("Sync storage:", await chrome.storage.sync.get(null));
+    }
 };
 
 // Event Listeners
 chrome.runtime.onInstalled.addListener(() => {
+    // clear local and sync storage
+    // chrome.storage.local.clear();
+    // chrome.storage.sync.clear();
     syncToLocal();
     loadForgettingCurve();
 });

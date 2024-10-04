@@ -53,7 +53,7 @@ export function requiresReview(problem: Problem): boolean {
     return timeDiffInMs >= reviewIntervalInMs;
 }
 
-export function awaitingReview(problem: Problem): boolean {
+export function inSchedule(problem: Problem): boolean {
     return !requiresReview(problem) && problem.proficiency < 5;
 }
 
@@ -64,9 +64,11 @@ export function isArchived(problem: Problem): boolean {
 export function getProblemStatus(problem: Problem): string {
     if (isArchived(problem)) {
         return 'Archived';
-    } else if (awaitingReview(problem)) {
+    } else if (requiresReview(problem)) {
         return 'Review';
-    } else {
+    } else if (inSchedule(problem)) {
         return 'Scheduled';
+    } else {
+        return 'Unknown';
     }
 }

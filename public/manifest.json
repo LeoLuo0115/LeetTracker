@@ -35,9 +35,7 @@
   ],
 
   "host_permissions": [
-    "*://*.leetcode.com/*",
-    "http://*/*",
-    "https://*/*"
+    "*://*.leetcode.com/*"
   ],
 
   "content_scripts": [
