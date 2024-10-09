@@ -4,7 +4,7 @@ export interface Problem {
     title: string;
     difficulty: string;
     url: string;
-    submissionTime: number;
+    firstSubmissionTime: number;
     proficiency: number;
     isArchived: boolean;
 }
@@ -47,7 +47,7 @@ export function requiresReview(problem: Problem): boolean {
     }
 
     const currentTime = Date.now();
-    const timeDiffInMs = currentTime - problem.submissionTime;
+    const timeDiffInMs = currentTime - problem.firstSubmissionTime;
     const reviewIntervalInMs = forgettingCurve[problem.proficiency] * MS_PER_DAY;
     
     return timeDiffInMs >= reviewIntervalInMs;

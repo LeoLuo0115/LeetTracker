@@ -1,6 +1,6 @@
 import { SUBMISSION_CHECK_URL, DEBOUNCE_DELAY, getTitleSlug, getCurrentTab, debounce} from './lib/background-utils';
 import { Problem, loadForgettingCurve, getProblemStatus } from './lib/problem-manager';
-import { queryProblemInfo } from './lib/background-api';
+import { queryProblemInfo, querySubmissionDetails } from './lib/background-api';
 
 // Sync cloud to local storage
 const syncToLocal = () => {
@@ -21,20 +21,35 @@ const saveProblemToStorage = async (problem: Problem) => {
 };
 
 // Main Functionality
-const handleSubmission = async ({ url }: { url: string }) => {
-    // console.log("Processing final submission:", url);
+const handleSubmission = async (details: chrome.webRequest.WebResponseCacheDetails) => {
+    // Check if the request was initiated by LeetCode
+    if (details.initiator !== "https://leetcode.com") {
+        console.log("Skipping non-LeetCode request:", details.url);
+        return;
+    }
+
+    console.log("Processing final submission:", details.url);
+    
     const currentTab = await getCurrentTab();
-    // console.log("Current tab url:", currentTab?.url);
     const titleSlug = getTitleSlug(currentTab?.url!);
-    // console.log("Title slug:", titleSlug);
+
+    // get submission details
+    const submissionDetails = await querySubmissionDetails(details.url);
+    console.log("Submission details:", submissionDetails);
+    if (submissionDetails.status_msg !== "Accepted") {
+        console.log("Submission not accepted, skipping");
+        return;
+    }
+    
+    // get problem info
     const question = await queryProblemInfo(titleSlug);
-    // console.log("Question:", question);
-    // const problemId = question.questionFrontendId;
-    // console.log("Problem id:", problemId);
+    console.log("Question:", question);
+    const problemId = question.questionFrontendId;
+    console.log("Problem id:", problemId);
     
     // make sure question is in cloud storage if not, create a new problem
-    const result = await chrome.storage.local.get(question.questionFrontendId);
-    const existingProblem = result[question.questionFrontendId as keyof typeof result] as Problem | undefined;
+    const result = await chrome.storage.local.get(problemId);
+    const existingProblem = result[problemId as keyof typeof result] as Problem | undefined;
 
     if (existingProblem && getProblemStatus(existingProblem) !== "Archived") {
         // calculate problem status
@@ -61,7 +76,7 @@ const handleSubmission = async ({ url }: { url: string }) => {
             difficulty: question.difficulty,
             url: `https://leetcode.com/problems/${titleSlug}/`,
             proficiency: Math.min((existingProblem?.proficiency || 0) + 1, 5),
-            submissionTime: now,
+            firstSubmissionTime: now,
             isArchived: (existingProblem?.proficiency || 0) + 1 >= 5
         };
         await saveProblemToStorage(newProblem);
@@ -74,9 +89,14 @@ const handleSubmission = async ({ url }: { url: string }) => {
 
 // Event Listeners
 chrome.runtime.onInstalled.addListener(() => {
-    // clear local and sync storage
-    // chrome.storage.local.clear();
-    // chrome.storage.sync.clear();
+    // // clear local storage
+    // chrome.storage.local.clear(() => {
+        console.log("Local storage cleared");
+    });
+    // // clear sync storage
+    // chrome.storage.sync.clear(() => {
+    //     console.log("Sync storage cleared");
+    // });
     syncToLocal();
     loadForgettingCurve();
 });
@@ -95,5 +115,6 @@ const debouncedHandleSubmission = debounce(handleSubmission, DEBOUNCE_DELAY);
 
 chrome.webRequest.onCompleted.addListener(
     debouncedHandleSubmission,
-    { urls: [SUBMISSION_CHECK_URL] }
+    { urls: [SUBMISSION_CHECK_URL] },
+    ["responseHeaders", "extraHeaders"]
 );

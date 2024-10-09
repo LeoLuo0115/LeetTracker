@@ -50,3 +50,30 @@ export const queryProblemInfo = (titleSlug: string): Promise<any> => {
       .catch((err) => reject(err));
   });
 };
+
+export const querySubmissionDetails = (url: string): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    const fetchDetail = () => {
+      fetch(url, {
+        method: "GET",
+      })
+        .then((res) => res.json())
+        .then((res) => {
+          if (!res) {
+            reject(new Error("No response data"));
+            return;
+          }
+
+          if (res.state !== "SUCCESS") {
+            setTimeout(fetchDetail, 2000);
+            return;
+          }
+
+          resolve(res);
+        })
+        .catch((err) => reject(err));
+    };
+
+    fetchDetail();
+  });
+};
