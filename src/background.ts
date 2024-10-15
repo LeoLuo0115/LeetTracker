@@ -91,15 +91,15 @@ const handleSubmission = async (details: chrome.webRequest.WebResponseCacheDetai
 chrome.runtime.onInstalled.addListener(() => {
     // // clear local storage
     // chrome.storage.local.clear(() => {
-        console.log("Local storage cleared");
-    });
+    //     console.log("Local storage cleared");
+    // });
     // // clear sync storage
     // chrome.storage.sync.clear(() => {
     //     console.log("Sync storage cleared");
     // });
     syncToLocal();
     loadForgettingCurve();
-});
+}); 
 
 chrome.webNavigation.onBeforeNavigate.addListener(
     ({ url }) => console.log("AWAKE: urlContains redirecting to " + url),
