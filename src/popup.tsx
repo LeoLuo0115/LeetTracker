@@ -1,11 +1,18 @@
 import React, { useEffect, useState, useCallback } from "react"
 import { createRoot } from "react-dom/client"
 import { Button } from "@/components/ui/button"
-import { Settings, Clock, AlertCircle, Archive, Search } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import { Settings, Clock, AlertCircle, Archive, Search, Filter } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
 import { FixedSizeList as List } from 'react-window'
 import AutoSizer from 'react-virtualized-auto-sizer'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import "./globals.css"
 import { Problem, getProblemStatus } from './lib/problem-manager'
 
@@ -14,6 +21,7 @@ export default function Component() {
   const [problems, setProblems] = useState<Problem[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [sortOption, setSortOption] = useState<'id' | 'difficulty' | 'title' | 'proficiency'>('id')
 
   const fetchProblems = useCallback(async () => {
     setLoading(true)
@@ -42,12 +50,36 @@ export default function Component() {
     chrome.tabs.create({ url });
   };
 
-  const filteredProblems = problems
-    .filter(problem => getProblemStatus(problem) === activeTab)
-    .filter(problem => 
-      problem.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      problem.id.toString().includes(searchTerm)
-    )
+  const openOptionsPage = () => {
+    chrome.runtime.openOptionsPage();
+  };
+
+  const sortProblems = (problems: Problem[]) => {
+    return problems.sort((a, b) => {
+      switch (sortOption) {
+        case 'id':
+          return Number(a.id) - Number(b.id);
+        case 'difficulty':
+          const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
+          return difficultyOrder[a.difficulty as keyof typeof difficultyOrder] - difficultyOrder[b.difficulty as keyof typeof difficultyOrder];
+        case 'title':
+          return a.title.localeCompare(b.title);
+        case 'proficiency':
+          return b.proficiency - a.proficiency; // 按熟练度降序排列
+        default:
+          return 0;
+      }
+    });
+  };
+
+  const filteredProblems = sortProblems(
+    problems
+      .filter(problem => getProblemStatus(problem) === activeTab)
+      .filter(problem => 
+        problem.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        problem.id.toString().includes(searchTerm)
+      )
+  );
 
   const ProblemItem = ({ index, style }: { index: number, style: React.CSSProperties }) => {
     const problem = filteredProblems[index];
@@ -62,7 +94,7 @@ export default function Component() {
             >
               <div className="flex items-center flex-grow">
                 <div className={`w-3 h-3 rounded-full ${getDifficultyColor(problem.difficulty)} mr-3 transition-all duration-200 ease-in-out group-hover:scale-125`}></div>
-                <div className="flex flex-col">
+                <div className="flex flex-col flex-grow">
                   <span className="text-sm font-medium text-gray-700 transition-all duration-200 ease-in-out group-hover:translate-x-1">
                     {`${problem.id}. ${problem.title}`}
                   </span>
@@ -70,15 +102,17 @@ export default function Component() {
                     {`Difficulty: ${problem.difficulty}`}
                   </span>
                 </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                {/* 这里预留了空间用于未来添加按钮 */}
+                <div className="flex items-center space-x-2 ml-2">
+                  <Progress value={(problem.proficiency / 5) * 100} className="w-16 h-2" />
+                  <span className="text-xs text-gray-500">{problem.proficiency}/5</span>
+                </div>
               </div>
             </div>
           </TooltipTrigger>
           <TooltipContent>
             <p>{`${problem.id}. ${problem.title}`}</p>
             <p>{`Difficulty: ${problem.difficulty}`}</p>
+            <p>{`Proficiency: ${problem.proficiency}/5`}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -89,13 +123,41 @@ export default function Component() {
     <div className="w-[400px] h-[600px] bg-white p-6 flex flex-col">
       <header className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">LeetTracker</h1>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="transition-all duration-200 ease-in-out hover:bg-gray-100 hover:rotate-45"
-        >
-          <Settings className="h-5 w-5" />
-        </Button>
+        <div className="flex space-x-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="transition-all duration-200 ease-in-out hover:bg-gray-100"
+              >
+                <Filter className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setSortOption('id')}>
+                Sort by ID
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortOption('difficulty')}>
+                Sort by Difficulty
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortOption('title')}>
+                Sort by Title
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortOption('proficiency')}>
+                Sort by Proficiency
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="transition-all duration-200 ease-in-out hover:bg-gray-100 hover:rotate-45"
+            onClick={openOptionsPage}
+          >
+            <Settings className="h-5 w-5" />
+          </Button>
+        </div>
       </header>
       
       <div className="flex mb-6 space-x-3">

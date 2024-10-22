@@ -164,7 +164,7 @@ export default function Component() {
             )}
             <p className="text-sm text-gray-500">
               Enter {FORGETTING_CURVE_LENGTH} increasing integers ({MIN_DAY}-{MAX_DAY}) for reminders, separated by commas.
-              These intervals define when you'll review problems for optimal long-term retention.
+              These intervals tell you when to review problems based on the forgetting curve.
             </p>
           </div>
 
