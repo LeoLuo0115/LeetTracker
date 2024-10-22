@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
 }
@@ -17,6 +26,22 @@
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+@keyframes wave {
+  0% {
+    transform: translateX(-25%) translateY(10%) rotate(0deg);
+  }
+  50% {
+    transform: translateX(-25%) translateY(-10%) rotate(0deg);
+  }
+  100% {
+    transform: translateX(-25%) translateY(10%) rotate(0deg);
+  }
+}
+
+.animate-wave {
+  animation: wave 3s ease-in-out infinite;
 }
 
 @layer base {
